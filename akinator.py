@@ -3,8 +3,11 @@ import csv
 
 # A classe Noh representa um nó na árvore de decisão. O nó é a pergunta
 class Noh:
-    def __init__(self, string):
-        self.string = string  # string é a pergunta ou o nome do personagem
+    def __init__(self, string, eh_pergunta: bool):
+        # string é a pergunta ou o nome do personagem
+        self.string = string
+        # se é uma pergunta vale True, senão é personagem
+        self.eh_pergunta = eh_pergunta
         self.esq = None
         self.dir = None
 
@@ -19,12 +22,42 @@ def criar_arvore(perguntas: list) -> Noh | None:
     if len(perguntas) == 0:  # Se não houver perguntas no header ele não cria a árvore
         return None
 
-    arvore = criar_noh(perguntas[0])  # cria o nó raiz com a primeira pergunta
+    arvore = Noh(perguntas[0], True)  # Cria o nó raiz da árvore
 
     # uso da recursão para criar a árvore da esquerda e da direita
     arvore.esq = criar_arvore(perguntas[1:])
     arvore.dir = criar_arvore(perguntas[1:])
     return arvore
+
+
+def contar_alturas_folhas(noh, altura=0, alturas=[]):
+    if noh is None:
+        return
+    if not noh.eh_pergunta:  # Se for um nó folha (não é uma pergunta)
+        alturas.append(altura)
+    else:
+        contar_alturas_folhas(noh.esq, altura + 1, alturas)
+        contar_alturas_folhas(noh.dir, altura + 1, alturas)
+    return alturas
+
+
+def coletar_folhas_personagens(noh, folhas=[]):
+    if noh is None:
+        return
+    if not noh.eh_pergunta:  # Se for um nó folha (não é uma pergunta)
+        folhas.append(noh.string)
+    else:
+        coletar_folhas_personagens(noh.esq, folhas)
+        coletar_folhas_personagens(noh.dir, folhas)
+    return folhas
+
+
+def imprimir_arvore(noh, prefixo="", eh_esq=True):
+    if noh is not None:
+        print(prefixo + ("|-- " if eh_esq else "\\-- ") + str(noh.string))
+        prefixo += "|   " if eh_esq else "    "
+        imprimir_arvore(noh.esq, prefixo, True)
+        imprimir_arvore(noh.dir, prefixo, False)
 
 
 def imprimir(arvore):
@@ -69,7 +102,7 @@ def insere_personagem(noh_raiz_arvore: Noh, perguntas: list, personagem_dict: di
             exit(1)  # Sai do programa
 
         # se não tiver ninguém na folha da esquerda, insere o personagem
-        noh_atual.esq = criar_noh(personagem_dict["nome"])
+        noh_atual.esq = Noh(personagem_dict["nome"], False)
     else:
         if noh_atual.dir != None:
             print(
@@ -79,7 +112,7 @@ def insere_personagem(noh_raiz_arvore: Noh, perguntas: list, personagem_dict: di
                 + personagem_dict["nome"]
             )
             exit(1)  # Sai do programa
-        noh_atual.dir = criar_noh(personagem_dict["nome"])
+        noh_atual.dir = Noh(personagem_dict["nome"], False)
 
 
 def main():
@@ -129,8 +162,15 @@ def main():
 
     # Responde com 1 (sim) ou 0 (não)
     # -1 para sair
-    # imprimir(arvore)
-    # exit()
+    imprimir_arvore(arvore)
+
+    alturas_folhas = contar_alturas_folhas(arvore)
+    print("Alturas das folhas:", alturas_folhas)
+
+    personagens = coletar_folhas_personagens(arvore)
+    print("Personagens:", personagens)
+
+    exit()
     option_input = 2
     atual = None  # Ponteiro para o nó atual da árvore
     while option_input != -1:
