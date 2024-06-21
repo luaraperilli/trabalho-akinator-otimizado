@@ -1,39 +1,63 @@
 import csv
 
 
-# A classe Noh representa um nó na árvore de decisão. O nó é a pergunta
+# Classe Noh representando um nó na árvore de decisão.
 class Noh:
     def __init__(self, string, eh_pergunta: bool):
-        # string é a pergunta ou o nome do personagem
         self.string = string
-        # se é uma pergunta vale True, senão é personagem
         self.eh_pergunta = eh_pergunta
         self.esq = None
         self.dir = None
 
 
 def criar_noh(string: str) -> Noh:
-    return Noh(string)
+    return Noh(string, True)
 
 
-# lista de perguntas que estão no header (primeira linha do arquivo csv)
-def criar_arvore(perguntas: list) -> Noh | None:
+def calcular_diferenca(respostas, pergunta, personagens):
+    sim, nao = 0, 0
+    for personagem in personagens:
+        if respostas[personagem][pergunta] == 1:
+            sim += 1
+        else:
+            nao += 1
+    return abs(sim - nao)
 
-    if len(perguntas) == 0:  # Se não houver perguntas no header ele não cria a árvore
+
+def escolher_melhor_pergunta(perguntas, respostas, personagens):
+    melhor_pergunta = None
+    menor_diferenca = float("inf")
+    for pergunta in perguntas:
+        diferenca = calcular_diferenca(respostas, pergunta, personagens)
+        if diferenca < menor_diferenca:
+            menor_diferenca = diferenca
+            melhor_pergunta = pergunta
+    return melhor_pergunta
+
+
+def criar_arvore_otimizada(perguntas, respostas, personagens) -> Noh:
+    if len(personagens) == 0 or len(perguntas) == 0:
         return None
+    if len(personagens) == 1:
+        return Noh(personagens[0], False)
 
-    arvore = Noh(perguntas[0], True)  # Cria o nó raiz da árvore
+    melhor_pergunta = escolher_melhor_pergunta(perguntas, respostas, personagens)
+    arvore = Noh(melhor_pergunta, True)
 
-    # uso da recursão para criar a árvore da esquerda e da direita
-    arvore.esq = criar_arvore(perguntas[1:])
-    arvore.dir = criar_arvore(perguntas[1:])
+    sim_personagens = [p for p in personagens if respostas[p][melhor_pergunta] == 1]
+    nao_personagens = [p for p in personagens if respostas[p][melhor_pergunta] == 0]
+
+    novas_perguntas = [p for p in perguntas if p != melhor_pergunta]
+    arvore.esq = criar_arvore_otimizada(novas_perguntas, respostas, sim_personagens)
+    arvore.dir = criar_arvore_otimizada(novas_perguntas, respostas, nao_personagens)
+
     return arvore
 
 
 def contar_alturas_folhas(noh, altura=0, alturas=[]):
     if noh is None:
         return
-    if not noh.eh_pergunta:  # Se for um nó folha (não é uma pergunta)
+    if not noh.eh_pergunta:
         alturas.append(altura)
     else:
         contar_alturas_folhas(noh.esq, altura + 1, alturas)
@@ -44,7 +68,7 @@ def contar_alturas_folhas(noh, altura=0, alturas=[]):
 def coletar_folhas_personagens(noh, folhas=[]):
     if noh is None:
         return
-    if not noh.eh_pergunta:  # Se for um nó folha (não é uma pergunta)
+    if not noh.eh_pergunta:
         folhas.append(noh.string)
     else:
         coletar_folhas_personagens(noh.esq, folhas)
@@ -60,48 +84,24 @@ def imprimir_arvore(noh, prefixo="", eh_esq=True):
         imprimir_arvore(noh.dir, prefixo, False)
 
 
-def imprimir(arvore):
-    if arvore == None:
-        return
-
-    print("(", end="")
-
-    imprimir(arvore.esq)
-    print(", ", str(arvore.string), ", ", end="")
-    imprimir(arvore.dir)
-    print(")", end="")
-    return
-
-
 def insere_personagem(noh_raiz_arvore: Noh, perguntas: list, personagem_dict: dict):
     noh_atual = noh_raiz_arvore
-
-    # Nesse for ele percorre todas as perguntas menos a última
-    # perguntas[:-1] -> pega todas as perguntas menos a última
     for p in perguntas[:-1]:
-        # Se a resposta for 1, vai para a esquerda, senão vai para a direita
-        if personagem_dict[p] == 1:  # 1 = sim
+        if personagem_dict[p] == 1:
             noh_atual = noh_atual.esq
         else:
             noh_atual = noh_atual.dir
 
-    # noh_atual é o nó que representa a última pergunta agora
-
-    # Trata a última pergunta
     ultima_pergunta = perguntas[-1]
-    # Se a resposta for 1, insere o personagem na esquerda, senão insere na direita
     if personagem_dict[ultima_pergunta] == 1:
         if noh_atual.esq != None:
-            string = (
+            print(
                 "Erro: folha já ocupada "
                 + noh_atual.esq.string
                 + " e "
                 + personagem_dict["nome"]
             )
-            print(string)
-            exit(1)  # Sai do programa
-
-        # se não tiver ninguém na folha da esquerda, insere o personagem
+            exit(1)
         noh_atual.esq = Noh(personagem_dict["nome"], False)
     else:
         if noh_atual.dir != None:
@@ -111,80 +111,42 @@ def insere_personagem(noh_raiz_arvore: Noh, perguntas: list, personagem_dict: di
                 + " e "
                 + personagem_dict["nome"]
             )
-            exit(1)  # Sai do programa
+            exit(1)
         noh_atual.dir = Noh(personagem_dict["nome"], False)
 
 
 def main():
-    # Abre o arquivo CSV para leitura
-    file_perguntas = open("animais.csv", "r")
-    # Lê os cabeçalhos do arquivo que se referem as perguntas
+    file_perguntas = open("pessoas.csv", "r")
     csvreader = csv.reader(file_perguntas)
-
-    # lê a primeira linha do arquivo e coloca os valores separados por virgula em uma lista de strings
     headers = next(csvreader)
-
-    # Headers[0] : 4 3
-    # 4 personagens e 3 perguntas
-    # 4 linhas e 3 colunas
-    # '4 3' -> map(int,["4", "3"]) -> [4, 3]
     num_personagens, num_perguntas = map(int, headers[0].split())
+    perguntas = headers[1 : num_perguntas + 1]
 
-    # adiciona as perguntas em uma lista
-    perguntas = []
-    for i in range(1, num_perguntas + 1):
-        perguntas.append(headers[i])
-
-    # print(num_personagens, num_perguntas)
-    # print(perguntas)
-
-    # lista de dicionários que contém os personagens com seus nomes e respostas
-    lista_dicts = []
-
+    respostas = {}
+    personagens = []
     # Cria um dicionário para cada personagem
+
     for linha in csvreader:
-        personagem_dict = {}
-        personagem_dict["nome"] = linha[0]
-        respostas = [int(i) for i in linha[1:]]
+        nome = linha[0]
+        respostas[nome] = {
+            perguntas[i]: int(linha[i + 1]) for i in range(num_perguntas)
+        }
+        personagens.append(nome)
 
-        for j in range(0, num_perguntas):
-            personagem_dict[perguntas[j]] = respostas[j]
-        # persongem_dict = exemplo: {'nome': 'Gato', 'É mamífero?': 1, 'Late?': 0, 'Cria em casa?': 1}
-        # print(personagem_dict)
-        lista_dicts.append(personagem_dict)
+    arvore_otimizada = criar_arvore_otimizada(perguntas, respostas, personagens)
+    # imprimir_arvore(arvore_otimizada)
 
-    # Cria a árvore com as perguntas mas sem personagem
-    arvore = criar_arvore(perguntas)  # criar_arvore retorna o Noh raiz da árvore
+    alturas_folhas = contar_alturas_folhas(arvore_otimizada)
+    # print("Alturas das folhas:", alturas_folhas)
 
-    # Insere personagens na árvore
-    for personagem_dict in lista_dicts:
-        insere_personagem(arvore, perguntas, personagem_dict)
+    # personagens_folhas = coletar_folhas_personagens(arvore_otimizada)
+    # print("Personagens:", personagens_folhas)
 
-    # Responde com 1 (sim) ou 0 (não)
-    # -1 para sair
-    imprimir_arvore(arvore)
-
-    alturas_folhas = contar_alturas_folhas(arvore)
-    print("Alturas das folhas:", alturas_folhas)
-
-    personagens = coletar_folhas_personagens(arvore)
-    print("Personagens:", personagens)
+    # calculo da média das alturas
+    media_alturas = sum(alturas_folhas) / len(alturas_folhas)
+    print(f"{media_alturas:.2f}")
 
     exit()
-    option_input = 2
-    atual = None  # Ponteiro para o nó atual da árvore
-    while option_input != -1:
-        if atual is None:
-            atual = arvore
-        print(atual.string)  # imprime a pergunta ou o personagem
-        option_input = int(input())
-        if option_input == 1:
-            atual = atual.esq
-        elif option_input == 0:
-            atual = atual.dir
-        elif option_input == -1:
-
-            break
 
 
 if __name__ == "__main__":
